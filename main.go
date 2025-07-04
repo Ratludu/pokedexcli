@@ -14,7 +14,12 @@ import (
 type cliCommand struct {
 	name        string
 	description string
-	callback    func() error
+	callback    func(*config) error
+}
+
+type config struct {
+	next     string
+	previous string
 }
 
 var mapping = make(map[string]cliCommand)
@@ -25,7 +30,7 @@ func main() {
 		"map": {
 			name:        "map",
 			description: "LocationArea",
-			callback:    getLocationAreas,
+			callback:    commandMap,
 		},
 		"help": {
 			name:        "help",
@@ -39,15 +44,23 @@ func main() {
 		},
 	}
 
+	areas := getLocationAreas()
+
 	fmt.Println("Welcome to Pokedex, Type a command to continue...")
 	fmt.Print("Pokedex > ")
 	scanner := bufio.NewScanner(os.Stdin)
 
 	for scanner.Scan() {
+
+		conf := config{
+			next:     areas.Next,
+			previous: areas.Previous,
+		}
+
 		line := scanner.Text()
 		if _, ok := mapping[line]; ok {
 			run := mapping[line].callback
-			run()
+			run(&conf)
 		} else {
 			fmt.Println("Unknown command")
 		}
@@ -57,13 +70,23 @@ func main() {
 
 }
 
-func commandExit() error {
+func commandMap(conf *config) error {
+
+	location := getLocationAreas()
+
+	for _, area := range location.Results {
+		fmt.Println(area.Name)
+	}
+
+	return nil
+}
+func commandExit(conf *config) error {
 	fmt.Println("Closing the Pokedex... Goodbye!")
 	os.Exit(0)
 	return nil
 }
 
-func commandHelp() error {
+func commandHelp(conf *config) error {
 	fmt.Println("Welcome to the Pokedex!")
 	fmt.Println("Useage:")
 	fmt.Println("")
@@ -92,10 +115,16 @@ func cleanInput(text string) []string {
 }
 
 type locationArea struct {
-	Count int `json:"count"`
+	Count    int    `json:"count"`
+	Next     string `json:"next"`
+	Previous string `json:"previous"`
+	Results  []struct {
+		Name string `json:"name"`
+		URL  string `json:"url"`
+	} `json:"results"`
 }
 
-func getLocationAreas() error {
+func getLocationAreas() locationArea {
 
 	url := "https://pokeapi.co/api/v2/location-area/"
 
@@ -122,8 +151,6 @@ func getLocationAreas() error {
 		log.Fatalf("Error unmarshalling the body: %v", err)
 	}
 
-	fmt.Println(locationarea.Count)
-
-	return nil
+	return locationarea
 
 }
